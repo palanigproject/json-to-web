@@ -1,0 +1,47 @@
+{
+  "name": "login",
+  "path": "/login",
+  "title": "Login",
+  "body": [
+    {
+      "type": "header",
+      "value": "User Login"
+    },
+    {
+      "type": "paragraph",
+      "value": "Please enter your credentials to access the system"
+    },
+    {
+      "type": "div",
+      "className": "login-form",
+      "id": "login-form"
+    },
+    {
+      "type": "textbox",
+      "name": "loginUsername",
+      "id": "loginUsername",
+      "placeholder": "Username",
+      "required": true
+    },
+    {
+      "type": "password",
+      "name": "loginPassword",
+      "id": "loginPassword",
+      "placeholder": "Password",
+      "required": true
+    },
+    {
+      "type": "button",
+      "label": "Login",
+      "onClick": "performLogin()",
+      "action": "login"
+    },
+    {
+      "type": "button",
+      "label": "Go to User Management",
+      "onClick": "goToLandingPage()",
+      "action": "navigate"
+    }
+  ]
+}
+

@@ -1,0 +1,11 @@
+{
+  "enabled": true,
+  "connection": {
+    "uri": "mongodb://127.0.0.1:27017/json-to-web",
+    "options": {
+      "useNewUrlParser": true,
+      "useUnifiedTopology": true
+    }
+  }
+}
+

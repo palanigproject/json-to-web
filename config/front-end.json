@@ -1,0 +1,11 @@
+{
+  "title": "User Management System",
+  "styles": {
+    "backgroundColor": "#f5f5f5",
+    "color": "#333",
+    "fontFamily": "Arial, sans-serif",
+    "padding": "20px"
+  },
+  "apiBaseUrl": "http://localhost:3000/api"
+}
+

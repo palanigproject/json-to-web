@@ -1,0 +1,23 @@
+{
+  "name": "json-to-web",
+  "version": "1.0.0",
+  "description": "Convert JSON to web files (HTML, CSS, JS)",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "build": "node index.js"
+  },
+  "bin": {
+    "json-to-web": "./index.js"
+  },
+  "preferGlobal": true,
+  "keywords": [
+    "json",
+    "html",
+    "web",
+    "generator"
+  ],
+  "author": "",
+  "license": "MIT"
+}
+

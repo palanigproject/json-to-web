@@ -1,0 +1,263 @@
+﻿{
+  "title": "User Management System",
+  "styles": {
+    "backgroundColor": "#f5f5f5",
+    "color": "#333",
+    "fontFamily": "Arial, sans-serif",
+    "padding": "20px"
+  },
+  "pages": [
+    {
+      "name": "login",
+      "path": "/login",
+      "title": "Login",
+      "body": [
+        {
+          "type": "header",
+          "value": "User Login"
+        },
+        {
+          "type": "paragraph",
+          "value": "Please enter your credentials to access the system"
+        },
+        {
+          "type": "div",
+          "className": "login-form",
+          "id": "login-form",
+          "text": ""
+        },
+        {
+          "type": "textbox",
+          "name": "loginUsername",
+          "id": "loginUsername",
+          "placeholder": "Username",
+          "required": true
+        },
+        {
+          "type": "input",
+          "type": "password",
+          "name": "loginPassword",
+          "id": "loginPassword",
+          "placeholder": "Password",
+          "required": true
+        },
+        {
+          "type": "button",
+          "label": "Login",
+          "onClick": "performLogin()",
+          "action": "login"
+        },
+        {
+          "type": "button",
+          "label": "Go to User Management",
+          "onClick": "goToLandingPage()",
+          "action": "navigate"
+        }
+      ]
+    },
+    {
+      "name": "landing",
+      "path": "/",
+      "title": "User Management",
+      "body": [
+        {
+          "type": "header",
+          "value": "User Management System"
+        },
+        {
+          "type": "paragraph",
+          "value": "Create and manage users with MongoDB backend"
+        },
+        {
+          "type": "div",
+          "className": "user-form",
+          "id": "user-form",
+          "text": ""
+        },
+        {
+          "type": "textbox",
+          "name": "username",
+          "id": "username",
+          "placeholder": "Username",
+          "required": true
+        },
+        {
+          "type": "textbox",
+          "name": "email",
+          "id": "email",
+          "placeholder": "Email address",
+          "required": true
+        },
+        {
+          "type": "input",
+          "type": "password",
+          "name": "password",
+          "id": "password",
+          "placeholder": "Password",
+          "required": true
+        },
+        {
+          "type": "button",
+          "label": "Create User",
+          "onClick": "createUser()",
+          "action": "create"
+        },
+        {
+          "type": "button",
+          "label": "List All Users",
+          "onClick": "listAllUsers()",
+          "action": "list"
+        },
+        {
+          "type": "button",
+          "label": "Back to Login",
+          "onClick": "goToLoginPage()",
+          "action": "navigate"
+        },
+        {
+          "type": "div",
+          "className": "users-list",
+          "id": "users-list",
+          "text": ""
+        },
+        {
+          "type": "div",
+          "className": "api-status",
+          "id": "api-status",
+          "text": "Ready to connect to API"
+        }
+      ]
+    }
+  ],
+  "database": {
+    "enabled": true,
+    "apiBaseUrl": "http://localhost:3000/api",
+    "models": [
+      {
+        "name": "User",
+        "endpoints": [
+          {
+            "method": "GET",
+            "path": "/api/users",
+            "description": "List all users",
+            "enabled": true,
+            "uiButton": "List All Users",
+            "uiFunction": "listAllUsers"
+          },
+          {
+            "method": "POST",
+            "path": "/api/users",
+            "description": "Create a new user",
+            "enabled": true,
+            "uiButton": "Create User",
+            "uiFunction": "createUser"
+          },
+          {
+            "method": "GET",
+            "path": "/api/users/:id",
+            "description": "Get user by ID",
+            "enabled": true
+          },
+          {
+            "method": "PUT",
+            "path": "/api/users/:id",
+            "description": "Update user by ID",
+            "enabled": true
+          },
+          {
+            "method": "DELETE",
+            "path": "/api/users/:id",
+            "description": "Delete user by ID",
+            "enabled": true
+          }
+        ],
+        "fields": [
+          {
+            "name": "username",
+            "type": "String",
+            "required": true,
+            "unique": true,
+            "uiType": "textbox"
+          },
+          {
+            "name": "email",
+            "type": "String",
+            "required": true,
+            "unique": true,
+            "uiType": "textbox"
+          },
+          {
+            "name": "password",
+            "type": "String",
+            "required": true,
+            "uiType": "password"
+          },
+          {
+            "name": "role",
+            "type": "String",
+            "default": "user",
+            "enum": ["user", "admin"],
+            "uiType": "select"
+          }
+        ]
+      },
+      {
+        "name": "Post",
+        "endpoints": [
+          {
+            "method": "GET",
+            "path": "/api/posts",
+            "description": "List all posts",
+            "enabled": true
+          },
+          {
+            "method": "POST",
+            "path": "/api/posts",
+            "description": "Create a new post",
+            "enabled": true
+          },
+          {
+            "method": "GET",
+            "path": "/api/posts/:id",
+            "description": "Get post by ID",
+            "enabled": true
+          },
+          {
+            "method": "PUT",
+            "path": "/api/posts/:id",
+            "description": "Update post by ID",
+            "enabled": true
+          },
+          {
+            "method": "DELETE",
+            "path": "/api/posts/:id",
+            "description": "Delete post by ID",
+            "enabled": true
+          }
+        ],
+        "fields": [
+          {
+            "name": "title",
+            "type": "String",
+            "required": true
+          },
+          {
+            "name": "content",
+            "type": "String",
+            "required": true
+          },
+          {
+            "name": "author",
+            "type": "ObjectId",
+            "ref": "User"
+          },
+          {
+            "name": "published",
+            "type": "Boolean",
+            "default": false
+          }
+        ]
+      }
+    ]
+  }
+}

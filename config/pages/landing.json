@@ -1,0 +1,71 @@
+{
+  "name": "landing",
+  "path": "/",
+  "title": "User Management",
+  "body": [
+    {
+      "type": "header",
+      "value": "User Management System"
+    },
+    {
+      "type": "paragraph",
+      "value": "Create and manage users with MongoDB backend"
+    },
+    {
+      "type": "div",
+      "className": "user-form",
+      "id": "user-form"
+    },
+    {
+      "type": "textbox",
+      "name": "username",
+      "id": "username",
+      "placeholder": "Username",
+      "required": true
+    },
+    {
+      "type": "textbox",
+      "name": "email",
+      "id": "email",
+      "placeholder": "Email address",
+      "required": true
+    },
+    {
+      "type": "password",
+      "name": "password",
+      "id": "password",
+      "placeholder": "Password",
+      "required": true
+    },
+    {
+      "type": "button",
+      "label": "Create User",
+      "onClick": "createUser()",
+      "action": "create"
+    },
+    {
+      "type": "button",
+      "label": "List All Users",
+      "onClick": "listAllUsers()",
+      "action": "list"
+    },
+    {
+      "type": "button",
+      "label": "Back to Login",
+      "onClick": "goToLoginPage()",
+      "action": "navigate"
+    },
+    {
+      "type": "div",
+      "className": "users-list",
+      "id": "users-list"
+    },
+    {
+      "type": "div",
+      "className": "api-status",
+      "id": "api-status",
+      "text": "Ready to connect to API"
+    }
+  ]
+}
+

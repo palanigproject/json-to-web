@@ -1,0 +1,130 @@
+{
+  "models": [
+    {
+      "name": "User",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/users",
+          "description": "List all users",
+          "enabled": true,
+          "uiButton": "List All Users",
+          "uiFunction": "listAllUsers"
+        },
+        {
+          "method": "POST",
+          "path": "/api/users",
+          "description": "Create a new user",
+          "enabled": true,
+          "uiButton": "Create User",
+          "uiFunction": "createUser"
+        },
+        {
+          "method": "GET",
+          "path": "/api/users/:id",
+          "description": "Get user by ID",
+          "enabled": true
+        },
+        {
+          "method": "PUT",
+          "path": "/api/users/:id",
+          "description": "Update user by ID",
+          "enabled": true
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/users/:id",
+          "description": "Delete user by ID",
+          "enabled": true
+        }
+      ],
+      "fields": [
+        {
+          "name": "username",
+          "type": "String",
+          "required": true,
+          "unique": true,
+          "uiType": "textbox"
+        },
+        {
+          "name": "email",
+          "type": "String",
+          "required": true,
+          "unique": true,
+          "uiType": "textbox"
+        },
+        {
+          "name": "password",
+          "type": "String",
+          "required": true,
+          "uiType": "password"
+        },
+        {
+          "name": "role",
+          "type": "String",
+          "default": "user",
+          "enum": ["user", "admin"],
+          "uiType": "select"
+        }
+      ]
+    },
+    {
+      "name": "Post",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/posts",
+          "description": "List all posts",
+          "enabled": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/posts",
+          "description": "Create a new post",
+          "enabled": true
+        },
+        {
+          "method": "GET",
+          "path": "/api/posts/:id",
+          "description": "Get post by ID",
+          "enabled": true
+        },
+        {
+          "method": "PUT",
+          "path": "/api/posts/:id",
+          "description": "Update post by ID",
+          "enabled": true
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/posts/:id",
+          "description": "Delete post by ID",
+          "enabled": true
+        }
+      ],
+      "fields": [
+        {
+          "name": "title",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "content",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "author",
+          "type": "ObjectId",
+          "ref": "User"
+        },
+        {
+          "name": "published",
+          "type": "Boolean",
+          "default": false
+        }
+      ]
+    }
+  ]
+}
+

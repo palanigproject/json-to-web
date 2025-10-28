@@ -1,0 +1,7 @@
+{
+  "enabled": true,
+  "port": 3000,
+  "cors": true,
+  "middleware": ["express.json()", "express.urlencoded({ extended: true })"]
+}
+
