@@ -60,6 +60,110 @@ function generateCSS(styles) {
   css += 'ul, ol {\n';
   css += '  margin: 10px 0;\n';
   css += '  padding-left: 20px;\n';
+  css += '}\n\n';
+  
+  // Add login form styles
+  css += '/* Login Form Styles */\n';
+  css += '.login-form {\n';
+  css += '  display: flex;\n';
+  css += '  flex-direction: column;\n';
+  css += '  gap: 15px;\n';
+  css += '  margin: 20px 0;\n';
+  css += '  max-width: 400px;\n';
+  css += '}\n\n';
+  css += '.login-form input {\n';
+  css += '  width: 100%;\n';
+  css += '}\n\n';
+  css += '.login-form button {\n';
+  css += '  align-self: flex-start;\n';
+  css += '}\n\n';
+  
+  // Add button styles
+  css += '/* Button Styles */\n';
+  css += '.secondary-btn {\n';
+  css += '  background-color: #6c757d;\n';
+  css += '  color: white;\n';
+  css += '  border: none;\n';
+  css += '  padding: 10px 20px;\n';
+  css += '  border-radius: 4px;\n';
+  css += '  cursor: pointer;\n';
+  css += '  margin-top: 10px;\n';
+  css += '}\n\n';
+  css += '.secondary-btn:hover {\n';
+  css += '  background-color: #5a6268;\n';
+  css += '}\n\n';
+  
+  // Add error and success message styles
+  css += '/* Error and Success Messages */\n';
+  css += '.error-message {\n';
+  css += '  color: #c33;\n';
+  css += '  background-color: #fee;\n';
+  css += '  border: 1px solid #c33;\n';
+  css += '  padding: 10px;\n';
+  css += '  border-radius: 4px;\n';
+  css += '  font-weight: bold;\n';
+  css += '  margin: 10px 0;\n';
+  css += '}\n\n';
+  css += '.success-message {\n';
+  css += '  color: #3c3;\n';
+  css += '  background-color: #efe;\n';
+  css += '  border: 1px solid #3c3;\n';
+  css += '  padding: 10px;\n';
+  css += '  border-radius: 4px;\n';
+  css += '  font-weight: bold;\n';
+  css += '  margin: 10px 0;\n';
+  css += '}\n\n';
+  
+  // Add table styles
+  css += '/* User List Table Styles */\n';
+  css += '.users-table {\n';
+  css += '  width: 100%;\n';
+  css += '  border-collapse: collapse;\n';
+  css += '  margin: 20px 0;\n';
+  css += '  background: white;\n';
+  css += '  border-radius: 8px;\n';
+  css += '  overflow: hidden;\n';
+  css += '  box-shadow: 0 2px 4px rgba(0,0,0,0.1);\n';
+  css += '}\n\n';
+  css += '.users-table thead {\n';
+  css += '  background-color: #007bff;\n';
+  css += '  color: white;\n';
+  css += '}\n\n';
+  css += '.users-table th {\n';
+  css += '  padding: 12px;\n';
+  css += '  text-align: left;\n';
+  css += '  font-weight: bold;\n';
+  css += '  border: none;\n';
+  css += '}\n\n';
+  css += '.users-table td {\n';
+  css += '  padding: 12px;\n';
+  css += '  border-bottom: 1px solid #ddd;\n';
+  css += '}\n\n';
+  css += '.users-table tbody tr:hover {\n';
+  css += '  background-color: #f8f9fa;\n';
+  css += '}\n\n';
+  css += '.users-table tbody tr:last-child td {\n';
+  css += '  border-bottom: none;\n';
+  css += '}\n\n';
+  css += '.delete-btn {\n';
+  css += '  background-color: #dc3545;\n';
+  css += '  color: white;\n';
+  css += '  border: none;\n';
+  css += '  padding: 6px 12px;\n';
+  css += '  border-radius: 4px;\n';
+  css += '  cursor: pointer;\n';
+  css += '  font-size: 12px;\n';
+  css += '  font-weight: bold;\n';
+  css += '}\n\n';
+  css += '.delete-btn:hover {\n';
+  css += '  background-color: #c82333;\n';
+  css += '}\n\n';
+  css += '#create-error-message,\n';
+  css += '#create-success-message {\n';
+  css += '  padding: 10px;\n';
+  css += '  margin: 10px 0;\n';
+  css += '  border-radius: 4px;\n';
+  css += '  font-weight: bold;\n';
   css += '}\n';
   
   return css;
@@ -358,24 +462,108 @@ function generateAPIFunctions(models) {
   js += `  document.getElementById('password')?.value = '';\n`;
   js += `}\n\n`;
   
-  js += `// Display users list\n`;
+  js += `// Display users list in tabular format\n`;
   js += `function displayUserList(users) {\n`;
-  js += `  const container = document.getElementById('users-list') || document.createElement('div');\n`;
-  js += `  if (!document.getElementById('users-list')) {\n`;
-  js += `    container.id = 'users-list';\n`;
-  js += `    document.body.appendChild(container);\n`;
+  js += `  // Try to find by ID first, then by class\n`;
+  js += `  let container = document.getElementById('users-list');\n`;
+  js += `  if (!container) {\n`;
+  js += `    container = document.querySelector('.users-list');\n`;
   js += `  }\n`;
-  js += `  container.innerHTML = '<h3>Users:</h3>' + users.map(u => \`<div><strong>\${u.username}</strong> - \${u.email} - Role: \${u.role}</div>\`).join('');\n`;
+  js += `  \n`;
+  js += `  if (!container) {\n`;
+  js += `    // Create container if it doesn't exist\n`;
+  js += `    container = document.createElement('div');\n`;
+  js += `    container.className = 'users-list';\n`;
+  js += `    container.id = 'users-list';\n`;
+  js += `    \n`;
+  js += `    // Find the container div or body and append\n`;
+  js += `    const mainContainer = document.querySelector('.container');\n`;
+  js += `    if (mainContainer) {\n`;
+  js += `      mainContainer.appendChild(container);\n`;
+  js += `    } else {\n`;
+  js += `      document.body.appendChild(container);\n`;
+  js += `    }\n`;
+  js += `  }\n`;
+  js += `  \n`;
+  js += `  if (users.length === 0) {\n`;
+  js += `    container.innerHTML = '<p>No users found</p>';\n`;
+  js += `    return;\n`;
+  js += `  }\n`;
+  js += `  \n`;
+  js += `  // Create table HTML\n`;
+  js += `  let tableHTML = '<h3>Registered Users</h3>';\n`;
+  js += `  tableHTML += '<table class="users-table">';\n`;
+  js += `  tableHTML += '<thead>';\n`;
+  js += `  tableHTML += '<tr>';\n`;
+  js += `  tableHTML += '<th>Username</th>';\n`;
+  js += `  tableHTML += '<th>Email</th>';\n`;
+  js += `  tableHTML += '<th>Role</th>';\n`;
+  js += `  tableHTML += '<th>Created</th>';\n`;
+  js += `  tableHTML += '<th>Actions</th>';\n`;
+  js += `  tableHTML += '</tr>';\n`;
+  js += `  tableHTML += '</thead>';\n`;
+  js += `  tableHTML += '<tbody>';\n`;
+  js += `  \n`;
+  js += `  // Add user rows\n`;
+  js += `  users.forEach(user => {\n`;
+  js += `    const createdDate = user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A';\n`;
+  js += `    tableHTML += '<tr>';\n`;
+  js += `    tableHTML += \`<td>\${escapeHtml(user.username || 'N/A')}</td>\`;\n`;
+  js += `    tableHTML += \`<td>\${escapeHtml(user.email || 'N/A')}</td>\`;\n`;
+  js += `    tableHTML += \`<td>\${escapeHtml(user.role || 'user')}</td>\`;\n`;
+  js += `    tableHTML += \`<td>\${escapeHtml(createdDate)}</td>\`;\n`;
+  js += `    tableHTML += \`<td><button onclick="deleteUser('\${user._id}')" class="delete-btn">Delete</button></td>\`;\n`;
+  js += `    tableHTML += '</tr>';\n`;
+  js += `  });\n`;
+  js += `  \n`;
+  js += `  tableHTML += '</tbody>';\n`;
+  js += `  tableHTML += '</table>';\n`;
+  js += `  \n`;
+  js += `  container.innerHTML = tableHTML;\n`;
+  js += `}\n\n`;
+  
+  js += `// Helper to escape HTML\n`;
+  js += `function escapeHtml(text) {\n`;
+  js += `  if (!text) return '';\n`;
+  js += `  const div = document.createElement('div');\n`;
+  js += `  div.textContent = text;\n`;
+  js += `  return div.innerHTML;\n`;
+  js += `}\n\n`;
+  
+  js += `// Delete user function\n`;
+  js += `async function deleteUser(userId) {\n`;
+  js += `  if (!confirm('Are you sure you want to delete this user?')) {\n`;
+  js += `    return;\n`;
+  js += `  }\n`;
+  js += `  \n`;
+  js += `  try {\n`;
+  js += `    const response = await fetch(\`\${API_BASE_URL}/users/\${userId}\`, {\n`;
+  js += `      method: 'DELETE'\n`;
+  js += `    });\n`;
+  js += `    \n`;
+  js += `    if (response.ok) {\n`;
+  js += `      alert('User deleted successfully');\n`;
+  js += `      await listAllUsers();\n`;
+  js += `    } else {\n`;
+  js += `      alert('Error deleting user');\n`;
+  js += `    }\n`;
+  js += `  } catch (error) {\n`;
+  js += `    console.error('Error deleting user:', error);\n`;
+  js += `    alert('Error deleting user');\n`;
+  js += `  }\n`;
   js += `}\n\n`;
   
   js += `// Make functions global\n`;
+  js += `if (typeof window !== 'undefined') {\n`;
   models.forEach(model => {
     model.endpoints.forEach(endpoint => {
       if (endpoint.uiFunction) {
-        js += `window.${endpoint.uiFunction} = ${endpoint.uiFunction};\n`;
+        js += `  window.${endpoint.uiFunction} = ${endpoint.uiFunction};\n`;
       }
     });
   });
+  js += `  window.deleteUser = deleteUser;\n`;
+  js += `}\n`;
   
   return js;
 }
@@ -698,7 +886,7 @@ function generateFiles(inputFile, configData) {
   fs.writeFileSync(path.join(cssDir, 'style.css'), css, 'utf8');
   
   const js = generateJS(data);
-  fs.writeFileSync(path.join(jsDir, 'script.js'), js, 'utf8');
+  fs.writeFileSync(path.join(jsDir, 'api-integration.js'), js, 'utf8');
   
   // Generate backend files
   generateServerFiles(outputDir, data);
