@@ -1,4 +1,5 @@
 ﻿{
+  "applicationName": "user-management-system",
   "title": "User Management System",
   "styles": {
     "backgroundColor": "#f5f5f5",
@@ -34,7 +35,6 @@
           "required": true
         },
         {
-          "type": "input",
           "type": "password",
           "name": "loginPassword",
           "id": "loginPassword",
@@ -89,7 +89,6 @@
           "required": true
         },
         {
-          "type": "input",
           "type": "password",
           "name": "password",
           "id": "password",

@@ -11,13 +11,39 @@ const PORT = 3000;
 let previewServerProcess = null;
 let previewServerPort = 3001; // Different port for generated app
 
+// Helper function to get application name from config
+function getApplicationName() {
+  try {
+    const configPath = path.join(__dirname, '..', 'config', 'front-end.json');
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      return config.applicationName || 'default-app';
+    }
+  } catch (error) {
+    console.error('Error reading application name from config:', error);
+  }
+  return 'default-app';
+}
+
+// Helper function to get application output path
+function getApplicationOutputPath() {
+  const applicationName = getApplicationName();
+  return path.join(__dirname, '..', 'output-web', applicationName);
+}
+
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static files from output-web/css and output-web/js
-app.use('/css', express.static(path.join(__dirname, '..', 'output-web', 'css')));
-app.use('/js', express.static(path.join(__dirname, '..', 'output-web', 'js')));
+// Serve static files from application-specific folder
+// Note: This is for backward compatibility, but the main app now uses application-specific folders
+const appOutputPath = getApplicationOutputPath();
+if (fs.existsSync(path.join(appOutputPath, 'css'))) {
+  app.use('/css', express.static(path.join(appOutputPath, 'css')));
+}
+if (fs.existsSync(path.join(appOutputPath, 'js'))) {
+  app.use('/js', express.static(path.join(appOutputPath, 'js')));
+}
 
 // Serve dashboard.html for root
 app.get('/', (req, res) => {
@@ -33,6 +59,106 @@ app.get('/', (req, res) => {
       console.log('Dashboard served successfully');
     }
   });
+});
+
+// Get MongoDB URI configuration
+app.get('/api/config/mongodb', (req, res) => {
+  try {
+    const configPath = path.join(__dirname, '..', 'config', 'database.json');
+    if (!fs.existsSync(configPath)) {
+      return res.status(404).json({
+        success: false,
+        message: 'Database config file not found'
+      });
+    }
+    
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    // Return standalone URI if available, otherwise return the main URI
+    const mongodbUri = config.connection?.standaloneUri || config.connection?.uri || 'mongodb://localhost:27017/json-to-web';
+    res.json({
+      success: true,
+      mongodbUri: mongodbUri,
+      dockerUri: config.connection?.uri || 'mongodb://admin:password123@mongodb:27017/json-to-web?authSource=admin',
+      standaloneUri: config.connection?.standaloneUri || mongodbUri,
+      enabled: config.enabled || false
+    });
+  } catch (error) {
+    console.error('Error reading MongoDB config:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to read MongoDB configuration',
+      error: error.message
+    });
+  }
+});
+
+// Update MongoDB URI configuration
+app.post('/api/config/mongodb', (req, res) => {
+  try {
+    const { mongodbUri, uriType } = req.body;
+    
+    if (!mongodbUri || typeof mongodbUri !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: 'MongoDB URI is required'
+      });
+    }
+    
+    const configPath = path.join(__dirname, '..', 'config', 'database.json');
+    
+    // Read existing config
+    let config = {};
+    if (fs.existsSync(configPath)) {
+      config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    } else {
+      // Create default config structure
+      config = {
+        enabled: true,
+        connection: {
+          uri: '',
+          standaloneUri: '',
+          options: {
+            useNewUrlParser: true,
+            useUnifiedTopology: true
+          }
+        }
+      };
+    }
+    
+    // Update MongoDB URI based on type
+    if (!config.connection) {
+      config.connection = {
+        options: {
+          useNewUrlParser: true,
+          useUnifiedTopology: true
+        }
+      };
+    }
+    
+    // uriType can be 'docker' or 'standalone' (defaults to standalone)
+    if (uriType === 'docker') {
+      config.connection.uri = mongodbUri;
+    } else {
+      // Default to standalone URI
+      config.connection.standaloneUri = mongodbUri;
+    }
+    
+    // Write back to file
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+    
+    res.json({
+      success: true,
+      message: `MongoDB ${uriType || 'standalone'} URI updated successfully`,
+      mongodbUri: mongodbUri
+    });
+  } catch (error) {
+    console.error('Error updating MongoDB config:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update MongoDB configuration',
+      error: error.message
+    });
+  }
 });
 
 // Build endpoint - generates files to output-web
@@ -62,13 +188,22 @@ app.post('/api/build', async (req, res) => {
 // Start Preview Server endpoint
 app.post('/api/preview/start', async (req, res) => {
   try {
-    const outputWebPath = path.join(__dirname, '..', 'output-web');
+    const outputWebPath = getApplicationOutputPath();
+    const outputWebBasePath = path.join(__dirname, '..', 'output-web');
     
-    // Check if output-web exists
-    if (!fs.existsSync(outputWebPath)) {
+    // Check if output-web base directory exists
+    if (!fs.existsSync(outputWebBasePath)) {
       return res.status(404).json({ 
         success: false, 
         message: 'Please build the application first!' 
+      });
+    }
+    
+    // Check if application folder exists
+    if (!fs.existsSync(outputWebPath)) {
+      return res.status(404).json({ 
+        success: false, 
+        message: `Application folder not found. Please build the application first! Expected: ${path.basename(outputWebPath)}` 
       });
     }
     
@@ -81,7 +216,7 @@ app.post('/api/preview/start', async (req, res) => {
       });
     }
     
-    // Change to output-web directory and start server
+    // Change to application directory and start server
     const serverPath = path.join(outputWebPath, 'server', 'server.js');
     
     if (!fs.existsSync(serverPath)) {
@@ -93,7 +228,7 @@ app.post('/api/preview/start', async (req, res) => {
     
     console.log('Starting preview server...');
     
-    // Check if docker-compose.yml exists
+    // Check if docker-compose.yml exists in application folder
     const dockerComposePath = path.join(outputWebPath, 'docker', 'docker-compose.yml');
     if (!fs.existsSync(dockerComposePath)) {
       return res.status(400).json({
@@ -114,9 +249,9 @@ app.post('/api/preview/start', async (req, res) => {
     let buildOutput = '';
     let buildErrors = '';
     
-    // Start Docker Compose from output-web directory (parent of docker folder)
+    // Start Docker Compose from application directory (parent of docker folder)
     previewServerProcess = spawn(dockerComposeCmd, dockerComposeArgs, {
-      cwd: outputWebPath, // Run from output-web directory
+      cwd: outputWebPath, // Run from application directory
       stdio: 'pipe',
       shell: true
     });
@@ -171,7 +306,7 @@ app.post('/api/preview/start', async (req, res) => {
       setTimeout(() => {
         // Check if containers are actually running
         const checkProcess = spawn('docker', ['compose', '-f', dockerComposePath, 'ps', '--format', 'json'], {
-          cwd: outputWebPath,
+          cwd: outputWebPath, // Run from application directory
           stdio: 'pipe',
           shell: true
         });
@@ -238,15 +373,221 @@ app.post('/api/preview/start', async (req, res) => {
   }
 });
 
-// Stop Preview Server endpoint
+// Start Standalone Node.js Server endpoint
+app.post('/api/preview/start-standalone', async (req, res) => {
+  try {
+    const outputWebPath = getApplicationOutputPath();
+    
+    // Check if application folder exists
+    if (!fs.existsSync(outputWebPath)) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Please build the application first!' 
+      });
+    }
+    
+    // Check if server is already running
+    if (previewServerProcess && !previewServerProcess.killed) {
+      return res.json({ 
+        success: true, 
+        message: 'Preview server is already running',
+        url: `http://localhost:${previewServerPort}`
+      });
+    }
+    
+    // Check if server.js exists
+    const serverPath = path.join(outputWebPath, 'server', 'server.js');
+    if (!fs.existsSync(serverPath)) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Server file not found. Please rebuild the application.' 
+      });
+    }
+    
+    // Check if package.json exists
+    const packageJsonPath = path.join(outputWebPath, 'package.json');
+    if (!fs.existsSync(packageJsonPath)) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'package.json not found. Please rebuild the application.' 
+      });
+    }
+    
+    console.log('Starting standalone Node.js server...');
+    
+    // Check if node_modules exists, if not, install dependencies
+    const nodeModulesPath = path.join(outputWebPath, 'node_modules');
+    if (!fs.existsSync(nodeModulesPath)) {
+      console.log('Installing dependencies...');
+      return new Promise((resolve, reject) => {
+        const installProcess = spawn('npm', ['install'], {
+          cwd: outputWebPath,
+          stdio: 'pipe',
+          shell: true
+        });
+        
+        let installOutput = '';
+        installProcess.stdout.on('data', (data) => {
+          installOutput += data.toString();
+          console.log(`npm install: ${data.toString()}`);
+        });
+        
+        installProcess.stderr.on('data', (data) => {
+          console.error(`npm install error: ${data.toString()}`);
+        });
+        
+        installProcess.on('close', (code) => {
+          if (code !== 0) {
+            reject(new Error('Failed to install dependencies'));
+          } else {
+            // After installation, start the server
+            startStandaloneServer(outputWebPath, res);
+          }
+        });
+        
+        installProcess.on('error', (err) => {
+          reject(err);
+        });
+      }).catch(error => {
+        res.status(500).json({ 
+          success: false, 
+          message: 'Failed to install dependencies',
+          error: error.message 
+        });
+      });
+    } else {
+      // Dependencies already installed, start server directly
+      startStandaloneServer(outputWebPath, res);
+    }
+    
+  } catch (error) {
+    console.error('Standalone start error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to start standalone server',
+      error: error.message 
+    });
+  }
+});
+
+// Helper function to start standalone server
+function startStandaloneServer(outputWebPath, res) {
+  // Load environment variables from .env file if it exists
+  const envPath = path.join(outputWebPath, '.env');
+  const env = { ...process.env };
+  
+  if (fs.existsSync(envPath)) {
+    // Read .env file and parse it
+    const envContent = fs.readFileSync(envPath, 'utf8');
+    envContent.split('\n').forEach(line => {
+      const trimmedLine = line.trim();
+      if (trimmedLine && !trimmedLine.startsWith('#')) {
+        const [key, ...valueParts] = trimmedLine.split('=');
+        if (key) {
+          env[key.trim()] = valueParts.join('=').trim();
+        }
+      }
+    });
+  }
+  
+  // Ensure PORT is set
+  env.PORT = previewServerPort;
+  env.NODE_ENV = env.NODE_ENV || 'development';
+  
+  // Start the Node.js server
+  previewServerProcess = spawn('node', ['server/server.js'], {
+    cwd: outputWebPath,
+    stdio: 'pipe',
+    shell: true,
+    env: env
+  });
+  
+  let responseSent = false;
+  
+  previewServerProcess.stdout.on('data', (data) => {
+    const output = data.toString();
+    console.log(`Standalone Server: ${output}`);
+    
+    // Check if server started successfully
+    if ((output.includes('Server is running') || output.includes('listening')) && !responseSent) {
+      responseSent = true;
+      res.json({
+        success: true,
+        message: 'Standalone server started successfully',
+        url: `http://localhost:${previewServerPort}`,
+        port: previewServerPort
+      });
+    }
+  });
+  
+  previewServerProcess.stderr.on('data', (data) => {
+    const error = data.toString();
+    console.error(`Standalone Server Error: ${error}`);
+    
+    // Check for MongoDB connection errors (these are expected if MongoDB isn't running)
+    if (error.includes('MongoServerError') || error.includes('ECONNREFUSED')) {
+      // Don't fail the request, just log it - server might still start
+      console.log('MongoDB connection issue (server may still work):', error);
+    }
+  });
+  
+  previewServerProcess.on('error', (err) => {
+    console.error('Failed to start standalone server:', err);
+    if (!responseSent) {
+      responseSent = true;
+      res.status(500).json({ 
+        success: false, 
+        message: 'Failed to start standalone server',
+        error: err.message 
+      });
+    }
+  });
+  
+  previewServerProcess.on('close', (code) => {
+    console.log(`Standalone server exited with code ${code}`);
+    previewServerProcess = null;
+    if (!responseSent && code !== 0) {
+      responseSent = true;
+      res.status(500).json({ 
+        success: false, 
+        message: 'Server exited unexpectedly',
+        error: `Process exited with code ${code}`
+      });
+    }
+  });
+  
+  // Timeout fallback - if server doesn't send startup message in 5 seconds, assume it started
+  setTimeout(() => {
+    if (!responseSent) {
+      responseSent = true;
+      res.json({
+        success: true,
+        message: 'Standalone server starting...',
+        url: `http://localhost:${previewServerPort}`,
+        port: previewServerPort
+      });
+    }
+  }, 5000);
+}
+
+// Stop Preview Server endpoint (handles both Docker and standalone)
 app.post('/api/preview/stop', (req, res) => {
-  const outputWebPath = path.join(__dirname, '..', 'output-web');
+  // First, try to stop the standalone Node.js server if it's running
+  if (previewServerProcess && !previewServerProcess.killed) {
+    console.log('Stopping standalone Node.js server...');
+    previewServerProcess.kill();
+    previewServerProcess = null;
+    return res.json({ success: true, message: 'Standalone server stopped successfully' });
+  }
+  
+  // If no standalone server, try to stop Docker Compose
+  const outputWebPath = getApplicationOutputPath();
   const dockerComposePath = path.join(outputWebPath, 'docker', 'docker-compose.yml');
   
   if (!fs.existsSync(dockerComposePath)) {
-    return res.status(400).json({
-      success: false,
-      message: 'Docker Compose file not found.'
+    return res.json({
+      success: true,
+      message: 'No server running to stop'
     });
   }
   
@@ -271,9 +612,9 @@ app.post('/api/preview/stop', (req, res) => {
     }
   }, 30000); // 30 second timeout
   
-  // Stop Docker Compose from output-web directory
+  // Stop Docker Compose from application directory
   const stopProcess = spawn(dockerComposeCmd, dockerComposeArgs, {
-    cwd: outputWebPath, // Run from output-web directory
+    cwd: outputWebPath, // Run from application directory
     stdio: 'pipe',
     shell: true
   });
@@ -304,11 +645,6 @@ app.post('/api/preview/stop', (req, res) => {
   stopProcess.on('close', (code) => {
     clearTimeout(timeout);
     
-    // Clear preview server process reference
-    if (previewServerProcess) {
-      previewServerProcess = null;
-    }
-    
     if (!responseSent) {
       responseSent = true;
       if (code === 0) {
@@ -322,7 +658,7 @@ app.post('/api/preview/stop', (req, res) => {
 
 // Check Preview Server status
 app.get('/api/preview/status', (req, res) => {
-  const outputWebPath = path.join(__dirname, '..', 'output-web');
+  const outputWebPath = getApplicationOutputPath();
   const dockerComposePath = path.join(outputWebPath, 'docker', 'docker-compose.yml');
   
   if (!fs.existsSync(dockerComposePath)) {
@@ -360,9 +696,9 @@ app.get('/api/preview/status', (req, res) => {
     }
   };
   
-  // Check if Docker containers are running from output-web directory
+  // Check if Docker containers are running from application directory
   const checkProcess = spawn(dockerComposeCmd, dockerComposeArgs, {
-    cwd: outputWebPath, // Run from output-web directory
+    cwd: outputWebPath, // Run from application directory
     stdio: 'pipe',
     shell: true
   });

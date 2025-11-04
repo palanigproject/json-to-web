@@ -158,7 +158,10 @@
                 🚀 Build Application
             </button>
             <button class="dashboard-btn secondary" onclick="previewApplication()">
-                👁️ Preview Application
+                👁️ Preview Application (Docker)
+            </button>
+            <button class="dashboard-btn secondary" onclick="startStandaloneServer()" style="background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);">
+                🚀 Start Standalone Server
             </button>
         </div>
 
@@ -175,6 +178,30 @@
                 <li><strong>Configure:</strong> Edit JSON files in the config/ directory</li>
                 <li><strong>Deploy:</strong> Use Docker containers for production deployment</li>
             </ul>
+
+            <h3>MongoDB Configuration</h3>
+            <div style="margin-bottom: 20px;">
+                <label for="mongodbUri" style="display: block; margin-bottom: 8px; font-weight: bold; color: #2c3e50;">
+                    MongoDB Connection URI:
+                </label>
+                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                    <input 
+                        type="text" 
+                        id="mongodbUri" 
+                        placeholder="mongodb://localhost:27017/json-to-web"
+                        style="flex: 1; padding: 10px; border: 2px solid #ddd; border-radius: 5px; font-size: 14px;"
+                    />
+                    <button 
+                        onclick="updateMongoDBUri()" 
+                        style="padding: 10px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;"
+                    >
+                        💾 Save
+                    </button>
+                </div>
+                <p style="font-size: 12px; color: #7f8c8d; margin: 0;">
+                    Examples: <code>mongodb://localhost:27017/json-to-web</code> or <code>mongodb://user:pass@host:27017/dbname</code>
+                </p>
+            </div>
 
             <h3>Configuration Files</h3>
             <ul>
@@ -279,6 +306,52 @@
                 });
         }
 
+        function startStandaloneServer() {
+            const btn = event.target;
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '⏳ Starting Standalone Server...';
+            btn.disabled = true;
+
+            fetch('/api/preview/start-standalone', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    btn.innerHTML = '✅ Standalone Running';
+                    btn.style.background = 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)';
+                    showMessage('success', data.message || 'Standalone server started!');
+                    
+                    // Wait a bit for server to fully start, then open
+                    setTimeout(() => {
+                        window.open(data.url, '_blank');
+                        setTimeout(() => {
+                            btn.innerHTML = originalText;
+                            btn.disabled = false;
+                            btn.style.background = 'linear-gradient(135deg, #3498db 0%, #2980b9 100%)';
+                        }, 2000);
+                    }, 2000);
+                } else {
+                    throw new Error(data.message || 'Failed to start standalone server');
+                }
+            })
+            .catch(error => {
+                console.error('Standalone server error:', error);
+                btn.innerHTML = '❌ Start Failed';
+                btn.style.background = 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)';
+                showMessage('error', error.message || 'Failed to start standalone server. Please check if the application is built.');
+                
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                    btn.style.background = 'linear-gradient(135deg, #3498db 0%, #2980b9 100%)';
+                }, 3000);
+            });
+        }
+
         function previewApplication() {
             const btn = event.target;
             const originalText = btn.innerHTML;
@@ -344,9 +417,74 @@
                 });
         }
 
+        // Load MongoDB URI on page load
+        function loadMongoDBUri() {
+            fetch('/api/config/mongodb')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('mongodbUri').value = data.mongodbUri || '';
+                    }
+                })
+                .catch(err => {
+                    console.error('Could not load MongoDB URI:', err);
+                    // Set default if loading fails
+                    document.getElementById('mongodbUri').value = 'mongodb://localhost:27017/json-to-web';
+                });
+        }
+
+        // Update MongoDB URI
+        function updateMongoDBUri() {
+            const uri = document.getElementById('mongodbUri').value.trim();
+            
+            if (!uri) {
+                showMessage('error', 'MongoDB URI cannot be empty');
+                return;
+            }
+            
+            // Basic validation
+            if (!uri.startsWith('mongodb://') && !uri.startsWith('mongodb+srv://')) {
+                showMessage('error', 'MongoDB URI must start with mongodb:// or mongodb+srv://');
+                return;
+            }
+            
+            const btn = event.target;
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '⏳ Saving...';
+            btn.disabled = true;
+            
+            fetch('/api/config/mongodb', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ mongodbUri: uri })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage('success', 'MongoDB URI saved successfully! Remember to rebuild the application for changes to take effect.');
+                    btn.innerHTML = '✅ Saved';
+                    setTimeout(() => {
+                        btn.innerHTML = originalText;
+                        btn.disabled = false;
+                    }, 2000);
+                } else {
+                    throw new Error(data.message || 'Failed to save MongoDB URI');
+                }
+            })
+            .catch(error => {
+                console.error('Error updating MongoDB URI:', error);
+                showMessage('error', error.message || 'Failed to save MongoDB URI');
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            });
+        }
+
         // Check status on page load
         document.addEventListener('DOMContentLoaded', function() {
             checkBackendStatus();
+            loadMongoDBUri();
             
             // Check preview server status
             fetch('/api/preview/status')

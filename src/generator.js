@@ -765,7 +765,7 @@ function generateServerFiles(outputDir, data) {
   fs.writeFileSync(path.join(outputDir, 'package.json'), packageContent, 'utf8');
   
   // Generate .env.example
-  const envContent = generateEnvExample();
+  const envContent = generateEnvExample(data.database);
   fs.writeFileSync(path.join(outputDir, '.env.example'), envContent, 'utf8');
   
   // Generate .env file (actual file with default values)
@@ -784,17 +784,22 @@ function generateServerJS(data) {
   return `const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const path = require('path');
 require('dotenv').config();
 const db = require('./config/database');
 const apiRoutes = require('./routes/api');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Serve static files (HTML, CSS, JS, images)
+// Serve from parent directory (output-web/<appName>/) so all files are accessible
+app.use(express.static(path.join(__dirname, '..')));
 
 // Routes
 app.use('/api', apiRoutes);
@@ -814,6 +819,8 @@ app.use((err, req, res, next) => {
 db().then(() => {
   app.listen(PORT, () => {
     console.log(\`Server is running on http://localhost:\${PORT}\`);
+    console.log(\`Frontend available at http://localhost:\${PORT}/index.html\`);
+    console.log(\`API available at http://localhost:\${PORT}/api\`);
   });
 }).catch(err => {
   console.error('Failed to start server:', err);
@@ -1231,9 +1238,16 @@ docker/`;
 }
 
 // Generate .env.example
-function generateEnvExample() {
+function generateEnvExample(databaseConfig) {
+  // Get MongoDB URI from database config
+  // For standalone mode, prefer standaloneUri if available, otherwise use uri
+  // For Docker mode, use uri (which typically has 'mongodb' as hostname)
+  const mongoUri = databaseConfig?.connection?.standaloneUri || databaseConfig?.connection?.uri || 'mongodb://localhost:27017/json-to-web';
+  
   return `# MongoDB Connection
-MONGODB_URI=mongodb://localhost:27017/json-to-web
+# For standalone mode, use the connection URI configured in database.json
+# For Docker mode, the URI will be set in docker-compose.yml
+MONGODB_URI=${mongoUri}
 
 # Server Port (Preview server uses port 3001 to avoid conflict with dashboard on 3000)
 PORT=3001
@@ -1247,12 +1261,20 @@ NODE_ENV=development
 function generateFiles(inputFile, configData) {
   const data = configData || readInputFile(inputFile);
   
+  // Get application name from data, with fallback to 'default-app'
+  const applicationName = data.applicationName || 'default-app';
+  
   // Create output directory structure (relative to project root)
-  const outputDir = path.join(__dirname, '..', 'output-web');
+  // Create output-web folder first, then application-specific folder inside it
+  const outputWebDir = path.join(__dirname, '..', 'output-web');
+  const outputDir = path.join(outputWebDir, applicationName);
   const cssDir = path.join(outputDir, 'css');
   const jsDir = path.join(outputDir, 'js');
   
   // Create directories if they don't exist
+  if (!fs.existsSync(outputWebDir)) {
+    fs.mkdirSync(outputWebDir, { recursive: true });
+  }
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
   }
@@ -1296,21 +1318,22 @@ function generateFiles(inputFile, configData) {
   generateDockerFiles(outputDir, data);
   
   console.log('Full-stack web application generated successfully!');
+  console.log(`Application name: ${applicationName}`);
   console.log('Folder structure:');
-  console.log('  output-web/');
+  console.log(`  output-web/${applicationName}/`);
   console.log('    - index.html');
   console.log('    - css/style.css');
-  console.log('    - js/script.js');
+  console.log('    - js/api-integration.js');
   console.log('    - server/');
   console.log('      - server.js');
   console.log('      - models/dataModel.js');
   console.log('      - routes/api.js');
   console.log('      - config/database.js');
-    console.log('    - package.json');
-    console.log('    - .env.example');
-    console.log('    - .env');
-    console.log('    - logo.svg');
-    console.log('    - docker/');
+  console.log('    - package.json');
+  console.log('    - .env.example');
+  console.log('    - .env');
+  console.log('    - logo.svg');
+  console.log('    - docker/');
 }
 
 // Generate dynamic model from JSON definition
@@ -1642,6 +1665,7 @@ function generateFromConfig() {
     
     // Combine into single config object
     const combinedConfig = {
+      applicationName: frontend.applicationName || 'default-app',
       title: frontend.title,
       styles: frontend.styles,
       pages: pages,
