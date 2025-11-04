@@ -1,6 +1,26 @@
 const fs = require('fs');
 const path = require('path');
 
+// Helper function to copy directory recursively
+function copyDirectory(src, dest) {
+  if (!fs.existsSync(dest)) {
+    fs.mkdirSync(dest, { recursive: true });
+  }
+  
+  const entries = fs.readdirSync(src, { withFileTypes: true });
+  
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    
+    if (entry.isDirectory()) {
+      copyDirectory(srcPath, destPath);
+    } else {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
+
 // Read input.json
 function readInputFile(inputFile) {
   const inputPath = inputFile || path.join(__dirname, '..', 'examples', 'input.json');
@@ -223,6 +243,18 @@ function generateHTMLForPage(data, page) {
     <div class="container">
 `;
   
+  // Add error/success message containers for login page
+  if (page.name === 'login') {
+    html += `      <div id="login-error-message" class="error-message" style="display: none;"></div>\n`;
+    html += `      <div id="login-success-message" class="success-message" style="display: none;"></div>\n`;
+  }
+  
+  // Add error/success message containers for landing/user management page
+  if (page.name === 'landing') {
+    html += `      <div id="create-error-message" class="error-message" style="display: none;"></div>\n`;
+    html += `      <div id="create-success-message" class="success-message" style="display: none;"></div>\n`;
+  }
+  
   for (const element of page.body) {
     html += generateElement(element);
   }
@@ -252,27 +284,13 @@ function generateNavigationJS(pages) {
         window.location.href = 'index.html';
       }
       
-      function performLogin() {
-        const usernameEl = document.getElementById('loginUsername');
-        const passwordEl = document.getElementById('loginPassword');
-        
-        const username = usernameEl ? usernameEl.value : '';
-        const password = passwordEl ? passwordEl.value : '';
-        
-        if (!username || !password) {
-          alert('Please enter username and password');
-          return;
-        }
-        
-        // Simple login check - in production, verify against backend
-        alert('Login successful! Redirecting to dashboard...');
-        goToLandingPage();
-      }
+      // performLogin() is defined in api-integration.js and calls backend MongoDB API
+      // DO NOT define a dummy performLogin here - it will override the real one!
       
       // Make functions global
       window.goToLoginPage = goToLoginPage;
       window.goToLandingPage = goToLandingPage;
-      window.performLogin = performLogin;
+      // performLogin is imported from api-integration.js
     </script>`;
   
   return js;
@@ -375,16 +393,30 @@ function escapeAttr(text) {
 function generateJS(data) {
   let js = '// Generated JavaScript with API Integration\n\n';
   
-  // Add API base URL
-  const apiBaseUrl = data.database && data.database.apiBaseUrl 
-    ? data.database.apiBaseUrl 
-    : 'http://localhost:3000/api';
-  
-  js += `const API_BASE_URL = '${apiBaseUrl}';\n\n`;
+  // Always use relative path '/api' - Nginx proxies to backend container (port 3001 internally)
+  // DO NOT use http://localhost:3001 directly - port 3001 is NOT exposed to browser
+  // This ensures it works through the nginx reverse proxy
+  js += `// Use relative path '/api' - Nginx proxies to backend container (port 3001 internally)\n`;
+  js += `// DO NOT use http://localhost:3001 directly - port 3001 is NOT exposed to browser\n`;
+  js += `const API_BASE_URL = '/api';\n\n`;
   
   // Generate API functions for each model
   if (data.database && data.database.enabled && data.database.models) {
     js += generateAPIFunctions(data.database.models);
+  }
+  
+  // Add helper functions for inline error/success messages
+  js += generateMessageHelpers();
+  
+  // Add performLogin function if login page exists
+  const hasLoginPage = data.pages && data.pages.some(p => p.name === 'login');
+  if (hasLoginPage) {
+    js += generatePerformLogin();
+  }
+  
+  // Add function exports
+  if (data.database && data.database.enabled && data.database.models) {
+    js += addFunctionExports('', data.database.models);
   }
   
   return js;
@@ -424,20 +456,36 @@ function generateAPIFunctions(models) {
         // Create
         js += `// Create ${modelNameLower}\n`;
         js += `async function ${funcName}() {\n`;
+        js += `  // Hide previous messages\n`;
+        js += `  hideError('create-error-message');\n`;
+        js += `  hideSuccess('create-success-message');\n`;
+        js += `  \n`;
         js += `  try {\n`;
         js += `    const formData = getFormData();\n`;
+        js += `    \n`;
+        js += `    // Basic validation\n`;
+        js += `    if (!formData.username || !formData.email || !formData.password) {\n`;
+        js += `      showError('create-error-message', 'Please fill in all required fields');\n`;
+        js += `      return;\n`;
+        js += `    }\n`;
+        js += `    \n`;
         js += `    const response = await fetch(\`\${API_BASE_URL}/${modelNamePlural}\`, {\n`;
         js += `      method: 'POST',\n`;
         js += `      headers: { 'Content-Type': 'application/json' },\n`;
         js += `      body: JSON.stringify(formData)\n`;
         js += `    });\n`;
         js += `    const data = await response.json();\n`;
-        js += `    console.log('Created:', data);\n`;
-        js += `    alert('${modelName} created successfully!');\n`;
-        js += `    clearForm();\n`;
+        js += `    \n`;
+        js += `    if (response.ok) {\n`;
+        js += `      console.log('Created:', data);\n`;
+        js += `      showSuccess('create-success-message', '${modelName} created successfully!');\n`;
+        js += `      clearForm();\n`;
+        js += `    } else {\n`;
+        js += `      showError('create-error-message', data.error || 'Error creating ${modelNameLower}');\n`;
+        js += `    }\n`;
         js += `  } catch (error) {\n`;
         js += `    console.error('Error creating ${modelNameLower}:', error);\n`;
-        js += `    alert('Error creating ${modelNameLower}');\n`;
+        js += `    showError('create-error-message', 'Error creating ${modelNameLower}. Please try again.');\n`;
         js += `  }\n`;
         js += `}\n\n`;
       }
@@ -457,9 +505,12 @@ function generateAPIFunctions(models) {
   
   js += `// Helper function to clear form\n`;
   js += `function clearForm() {\n`;
-  js += `  document.getElementById('username')?.value = '';\n`;
-  js += `  document.getElementById('email')?.value = '';\n`;
-  js += `  document.getElementById('password')?.value = '';\n`;
+  js += `  const usernameEl = document.getElementById('username');\n`;
+  js += `  if (usernameEl) usernameEl.value = '';\n`;
+  js += `  const emailEl = document.getElementById('email');\n`;
+  js += `  if (emailEl) emailEl.value = '';\n`;
+  js += `  const passwordEl = document.getElementById('password');\n`;
+  js += `  if (passwordEl) passwordEl.value = '';\n`;
   js += `}\n\n`;
   
   js += `// Display users list in tabular format\n`;
@@ -553,6 +604,100 @@ function generateAPIFunctions(models) {
   js += `  }\n`;
   js += `}\n\n`;
   
+  return js;
+}
+
+// Generate helper functions for inline error/success messages
+function generateMessageHelpers() {
+  let js = '';
+  js += `// Helper function to show inline error message\n`;
+  js += `function showError(elementId, message) {\n`;
+  js += `  const errorEl = document.getElementById(elementId);\n`;
+  js += `  if (errorEl) {\n`;
+  js += `    errorEl.textContent = message;\n`;
+  js += `    errorEl.style.display = 'block';\n`;
+  js += `    errorEl.className = 'error-message';\n`;
+  js += `  }\n`;
+  js += `}\n\n`;
+  js += `// Helper function to hide error message\n`;
+  js += `function hideError(elementId) {\n`;
+  js += `  const errorEl = document.getElementById(elementId);\n`;
+  js += `  if (errorEl) {\n`;
+  js += `    errorEl.style.display = 'none';\n`;
+  js += `    errorEl.textContent = '';\n`;
+  js += `  }\n`;
+  js += `}\n\n`;
+  js += `// Helper function to show inline success message\n`;
+  js += `function showSuccess(elementId, message) {\n`;
+  js += `  const successEl = document.getElementById(elementId);\n`;
+  js += `  if (successEl) {\n`;
+  js += `    successEl.textContent = message;\n`;
+  js += `    successEl.style.display = 'block';\n`;
+  js += `    successEl.className = 'success-message';\n`;
+  js += `  }\n`;
+  js += `}\n\n`;
+  js += `// Helper function to hide success message\n`;
+  js += `function hideSuccess(elementId) {\n`;
+  js += `  const successEl = document.getElementById(elementId);\n`;
+  js += `  if (successEl) {\n`;
+  js += `    successEl.style.display = 'none';\n`;
+  js += `    successEl.textContent = '';\n`;
+  js += `  }\n`;
+  js += `}\n\n`;
+  return js;
+}
+
+// Generate performLogin function for MongoDB authentication
+function generatePerformLogin() {
+  let js = '';
+  js += `// Login function - authenticates with backend MongoDB\n`;
+  js += `async function performLogin() {\n`;
+  js += `  // Hide previous errors\n`;
+  js += `  hideError('login-error-message');\n`;
+  js += `  hideSuccess('login-success-message');\n`;
+  js += `  \n`;
+  js += `  const usernameEl = document.getElementById('loginUsername');\n`;
+  js += `  const passwordEl = document.getElementById('loginPassword');\n`;
+  js += `  \n`;
+  js += `  const username = usernameEl ? usernameEl.value.trim() : '';\n`;
+  js += `  const password = passwordEl ? passwordEl.value : '';\n`;
+  js += `  \n`;
+  js += `  if (!username || !password) {\n`;
+  js += `    showError('login-error-message', 'Please enter username and password');\n`;
+  js += `    return;\n`;
+  js += `  }\n`;
+  js += `  \n`;
+  js += `  try {\n`;
+  js += `    const response = await fetch(\`\${API_BASE_URL}/users/login\`, {\n`;
+  js += `      method: 'POST',\n`;
+  js += `      headers: { 'Content-Type': 'application/json' },\n`;
+  js += `      body: JSON.stringify({ username, password })\n`;
+  js += `    });\n`;
+  js += `    \n`;
+  js += `    const data = await response.json();\n`;
+  js += `    \n`;
+  js += `    if (response.ok && data.message === 'Login successful') {\n`;
+  js += `      showSuccess('login-success-message', 'Login successful! Redirecting to dashboard...');\n`;
+  js += `      // Store user info in sessionStorage if needed\n`;
+  js += `      if (data.user) {\n`;
+  js += `        sessionStorage.setItem('loggedInUser', JSON.stringify(data.user));\n`;
+  js += `      }\n`;
+  js += `      setTimeout(() => {\n`;
+  js += `        window.location.href = 'index.html';\n`;
+  js += `      }, 1000);\n`;
+  js += `    } else {\n`;
+  js += `      showError('login-error-message', data.error || 'Invalid username or password');\n`;
+  js += `    }\n`;
+  js += `  } catch (error) {\n`;
+  js += `    console.error('Login error:', error);\n`;
+  js += `    showError('login-error-message', 'Error connecting to server. Please check if backend is running.');\n`;
+  js += `  }\n`;
+  js += `}\n\n`;
+  return js;
+}
+
+// Add function exports at end of generateAPIFunctions
+function addFunctionExports(js, models) {
   js += `// Make functions global\n`;
   js += `if (typeof window !== 'undefined') {\n`;
   models.forEach(model => {
@@ -563,8 +708,12 @@ function generateAPIFunctions(models) {
     });
   });
   js += `  window.deleteUser = deleteUser;\n`;
+  js += `  window.showError = showError;\n`;
+  js += `  window.hideError = hideError;\n`;
+  js += `  window.showSuccess = showSuccess;\n`;
+  js += `  window.hideSuccess = hideSuccess;\n`;
+  js += `  window.performLogin = performLogin;\n`;
   js += `}\n`;
-  
   return js;
 }
 
@@ -618,6 +767,16 @@ function generateServerFiles(outputDir, data) {
   // Generate .env.example
   const envContent = generateEnvExample();
   fs.writeFileSync(path.join(outputDir, '.env.example'), envContent, 'utf8');
+  
+  // Generate .env file (actual file with default values)
+  try {
+    const envPath = path.join(outputDir, '.env');
+    fs.writeFileSync(envPath, envContent, 'utf8');
+    console.log(`Created .env file at: ${envPath}`);
+  } catch (error) {
+    console.error(`Error creating .env file: ${error.message}`);
+    // Continue anyway - .env.example is still useful
+  }
 }
 
 // Generate server.js content
@@ -832,13 +991,252 @@ function generatePackageJSON() {
 `;
 }
 
+// Generate logo.svg
+function generateLogo(outputDir) {
+  const logoSvg = `<svg width="80" height="80" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="80" height="80" rx="15" fill="url(#grad1)"/>
+  <text x="40" y="50" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="white" text-anchor="middle">CADP</text>
+</svg>`;
+  
+  fs.writeFileSync(path.join(outputDir, 'logo.svg'), logoSvg, 'utf8');
+  console.log('Generated logo.svg');
+}
+
+// Generate Docker files
+function generateDockerFiles(outputDir, data) {
+  const dockerDir = path.join(outputDir, 'docker');
+  if (!fs.existsSync(dockerDir)) {
+    fs.mkdirSync(dockerDir, { recursive: true });
+  }
+  
+  // Generate Dockerfile
+  const dockerfile = `# Use Node.js LTS version
+FROM node:18-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm install --omit=dev --production
+
+# Copy application files
+COPY server/ ./server/
+COPY css/ ./css/
+COPY js/ ./js/
+COPY *.html ./
+
+# Expose port
+EXPOSE 3001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\
+  CMD node -e "require('http').get('http://localhost:3001/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+
+# Start the application
+CMD ["node", "server/server.js"]`;
+  
+  fs.writeFileSync(path.join(dockerDir, 'Dockerfile'), dockerfile, 'utf8');
+  
+  // Generate Dockerfile.dev
+  const dockerfileDev = `# Use Node.js LTS version
+FROM node:18-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies (including dev dependencies)
+RUN npm install
+
+# Copy application files
+COPY server/ ./server/
+COPY css/ ./css/
+COPY js/ ./js/
+COPY *.html ./
+
+# Expose port
+EXPOSE 3001
+
+# Start with nodemon for development
+CMD ["npx", "nodemon", "server/server.js"]`;
+  
+  fs.writeFileSync(path.join(dockerDir, 'Dockerfile.dev'), dockerfileDev, 'utf8');
+  
+  // Generate docker-compose.yml
+  const dockerCompose = `services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7
+    container_name: cadp-mongodb
+    restart: on-failure
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password123
+      MONGO_INITDB_DATABASE: json-to-web
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - cadp-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/json-to-web --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Node.js Backend Application
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: cadp-app
+    restart: on-failure
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://admin:password123@mongodb:27017/json-to-web?authSource=admin
+      - PORT=3001
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - cadp-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  # Nginx Frontend
+  nginx:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.nginx
+    container_name: cadp-nginx
+    restart: on-failure
+    ports:
+      - "8080:80"
+    depends_on:
+      app:
+        condition: service_healthy
+    networks:
+      - cadp-network
+
+volumes:
+  mongodb_data:
+    driver: local
+
+networks:
+  cadp-network:
+    name: cadp-network
+    driver: bridge`;
+  
+  fs.writeFileSync(path.join(dockerDir, 'docker-compose.yml'), dockerCompose, 'utf8');
+  
+  // Generate Dockerfile.nginx
+  const dockerfileNginx = `FROM nginx:alpine
+
+# Copy static files to nginx html directory
+COPY *.html /usr/share/nginx/html/
+COPY css/ /usr/share/nginx/html/css/
+COPY js/ /usr/share/nginx/html/js/
+COPY logo.svg /usr/share/nginx/html/
+
+# Copy nginx configuration
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]`;
+  
+  fs.writeFileSync(path.join(dockerDir, 'Dockerfile.nginx'), dockerfileNginx, 'utf8');
+  
+  // Generate nginx.conf
+  const nginxConf = `server {
+    listen 80;
+    server_name localhost;
+    root /usr/share/nginx/html;
+    index login.html;
+
+    # Serve static files (HTML, CSS, JS, images)
+    location / {
+        try_files $uri $uri/ /login.html;
+    }
+
+    # Proxy API requests to Node.js backend
+    location /api {
+        proxy_pass http://cadp-app:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    # Proxy health check
+    location /health {
+        proxy_pass http://cadp-app:3001/health;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+    }
+
+    # Gzip compression for better performance
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css text/xml text/javascript application/x-javascript application/xml+rss application/json;
+
+    # Cache static assets
+    location ~* \\\\.(jpg|jpeg|png|gif|ico|css|js|svg)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+}`;
+  
+  fs.writeFileSync(path.join(dockerDir, 'nginx.conf'), nginxConf, 'utf8');
+  
+  // Generate .dockerignore
+  const dockerignore = `node_modules
+npm-debug.log
+.git
+.gitignore
+*.md
+README.md
+.DS_Store
+*.log
+.env
+.env.local
+.env.*.local
+
+# Exclude docker folder from builds
+docker/`;
+  
+  fs.writeFileSync(path.join(dockerDir, '.dockerignore'), dockerignore, 'utf8');
+  
+  console.log('Generated Docker files in docker/ folder');
+}
+
 // Generate .env.example
 function generateEnvExample() {
   return `# MongoDB Connection
 MONGODB_URI=mongodb://localhost:27017/json-to-web
 
-# Server Port
-PORT=3000
+# Server Port (Preview server uses port 3001 to avoid conflict with dashboard on 3000)
+PORT=3001
 
 # Environment
 NODE_ENV=development
@@ -888,8 +1286,14 @@ function generateFiles(inputFile, configData) {
   const js = generateJS(data);
   fs.writeFileSync(path.join(jsDir, 'api-integration.js'), js, 'utf8');
   
+  // Generate logo.svg
+  generateLogo(outputDir);
+  
   // Generate backend files
   generateServerFiles(outputDir, data);
+  
+  // Generate Docker files
+  generateDockerFiles(outputDir, data);
   
   console.log('Full-stack web application generated successfully!');
   console.log('Folder structure:');
@@ -902,8 +1306,11 @@ function generateFiles(inputFile, configData) {
   console.log('      - models/dataModel.js');
   console.log('      - routes/api.js');
   console.log('      - config/database.js');
-  console.log('    - package.json');
-  console.log('    - .env.example');
+    console.log('    - package.json');
+    console.log('    - .env.example');
+    console.log('    - .env');
+    console.log('    - logo.svg');
+    console.log('    - docker/');
 }
 
 // Generate dynamic model from JSON definition
@@ -989,12 +1396,18 @@ ${modelNameLower}Schema.pre('save', function(next) {
 `;
   }
   
+  // Use custom collection name for User model
+  const collectionName = (modelName.toLowerCase() === 'user') ? 'sanchu-users' : null;
+  const modelExport = collectionName 
+    ? `module.exports = mongoose.model('${modelName}', ${modelNameLower}Schema, '${collectionName}');`
+    : `module.exports = mongoose.model('${modelName}', ${modelNameLower}Schema);`;
+  
   return `const mongoose = require('mongoose');
 
 const ${modelNameLower}Schema = new mongoose.Schema({${schemaFields}});
 ${preSaveHook}
 
-module.exports = mongoose.model('${modelName}', ${modelNameLower}Schema);
+${modelExport}
 `;
 }
 

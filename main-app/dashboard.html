@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON-TO-WEB Dashboard</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .dashboard-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            text-align: center;
+        }
+
+        .dashboard-header {
+            margin-bottom: 50px;
+        }
+
+        .dashboard-title {
+            font-size: 2.5rem;
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .dashboard-subtitle {
+            font-size: 1.2rem;
+            color: #7f8c8d;
+            margin-bottom: 30px;
+        }
+
+        .dashboard-logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.5rem;
+            font-weight: bold;
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .dashboard-buttons {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 40px;
+        }
+
+        .dashboard-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 20px 40px;
+            border-radius: 15px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            min-width: 180px;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .dashboard-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .dashboard-btn:active {
+            transform: translateY(-1px);
+        }
+
+        .dashboard-btn.secondary {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            box-shadow: 0 4px 15px rgba(240, 147, 251, 0.3);
+        }
+
+        .dashboard-btn.secondary:hover {
+            box-shadow: 0 8px 25px rgba(240, 147, 251, 0.4);
+        }
+
+        .dashboard-info {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            margin-top: 40px;
+            text-align: left;
+        }
+
+        .dashboard-info h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+
+        .dashboard-info p {
+            color: #7f8c8d;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+
+        .dashboard-info ul {
+            color: #7f8c8d;
+            padding-left: 20px;
+        }
+
+        .dashboard-info li {
+            margin-bottom: 5px;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-online {
+            background-color: #27ae60;
+        }
+
+        .status-offline {
+            background-color: #e74c3c;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .dashboard-btn {
+                width: 100%;
+                max-width: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <div class="dashboard-logo">J2W</div>
+            <h1 class="dashboard-title">JSON-TO-WEB</h1>
+            <p class="dashboard-subtitle">Transform JSON configurations into dynamic web applications</p>
+        </div>
+
+        <div class="dashboard-buttons">
+            <button class="dashboard-btn" onclick="buildApplication()">
+                🚀 Build Application
+            </button>
+            <button class="dashboard-btn secondary" onclick="previewApplication()">
+                👁️ Preview Application
+            </button>
+        </div>
+
+        <div class="dashboard-info">
+            <h3>Application Status</h3>
+            <p><span class="status-indicator status-online"></span><strong>Backend Server:</strong> Running on port 3000</p>
+            <p><span class="status-indicator status-online"></span><strong>Frontend Server:</strong> Running on port 8080</p>
+            <p><span class="status-indicator status-online"></span><strong>Database:</strong> MongoDB connected</p>
+            
+            <h3>Quick Actions</h3>
+            <ul>
+                <li><strong>Build:</strong> Generate web application from JSON configuration</li>
+                <li><strong>Preview:</strong> View the generated application in browser</li>
+                <li><strong>Configure:</strong> Edit JSON files in the config/ directory</li>
+                <li><strong>Deploy:</strong> Use Docker containers for production deployment</li>
+            </ul>
+
+            <h3>Configuration Files</h3>
+            <ul>
+                <li><code>config/front-end.json</code> - Frontend page structure</li>
+                <li><code>config/back-end.json</code> - Backend API configuration</li>
+                <li><code>config/database.json</code> - Database settings</li>
+                <li><code>config/models.json</code> - Data models</li>
+                <li><code>config/pages/</code> - Individual page configurations</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        function buildApplication() {
+            // Show loading state
+            const btn = event.target;
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '⏳ Building...';
+            btn.disabled = true;
+
+            // Call build API
+            fetch('/api/build', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    btn.innerHTML = '✅ Build Complete!';
+                    btn.style.background = 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)';
+                    
+                    // Show success message
+                    showMessage('success', data.message || 'Application built successfully!');
+                    
+                    setTimeout(() => {
+                        btn.innerHTML = originalText;
+                        btn.disabled = false;
+                        btn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                    }, 3000);
+                } else {
+                    throw new Error(data.message || 'Build failed');
+                }
+            })
+            .catch(error => {
+                console.error('Build error:', error);
+                btn.innerHTML = '❌ Build Failed';
+                btn.style.background = 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)';
+                showMessage('error', error.message || 'Build failed. Please check the console for details.');
+                
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                    btn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                }, 3000);
+            });
+        }
+
+        function showMessage(type, message) {
+            // Remove existing messages
+            const existing = document.querySelector('.build-message');
+            if (existing) existing.remove();
+
+            // Create message element
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `build-message ${type === 'success' ? 'success' : 'error'}`;
+            msgDiv.textContent = message;
+            msgDiv.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 20px;
+                border-radius: 8px;
+                color: white;
+                font-weight: 600;
+                z-index: 1000;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                ${type === 'success' 
+                    ? 'background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);'
+                    : 'background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);'
+                }
+            `;
+
+            document.body.appendChild(msgDiv);
+
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                msgDiv.remove();
+            }, 5000);
+        }
+
+        // Check backend status
+        function checkBackendStatus() {
+            fetch('/health')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Backend status:', data);
+                })
+                .catch(error => {
+                    console.log('Backend not accessible:', error);
+                });
+        }
+
+        function previewApplication() {
+            const btn = event.target;
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '⏳ Starting Preview...';
+            btn.disabled = true;
+
+            // First check if preview server is already running
+            fetch('/api/preview/status')
+                .then(response => response.json())
+                .then(status => {
+                    if (status.running) {
+                        // Server already running, open it
+                        window.open('http://localhost:8080', '_blank');
+                        btn.innerHTML = originalText;
+                        btn.disabled = false;
+                        showMessage('success', 'Frontend opened at http://localhost:8080!');
+                    } else {
+                        // Start the preview server
+                        return fetch('/api/preview/start', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                    }
+                })
+                .then(response => {
+                    if (response && response.ok) {
+                        return response.json();
+                    }
+                    return null;
+                })
+                .then(data => {
+                    if (data && data.success) {
+                        btn.innerHTML = '✅ Docker Running';
+                        btn.style.background = 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)';
+                        showMessage('success', data.message || 'Docker Compose started! Frontend available at http://localhost:8080');
+                        
+                        // Wait a bit more for Docker to fully start, then open
+                        setTimeout(() => {
+                            window.open('http://localhost:8080', '_blank');
+                            setTimeout(() => {
+                                btn.innerHTML = originalText;
+                                btn.disabled = false;
+                                btn.style.background = 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
+                            }, 2000);
+                        }, 3000);
+                    } else {
+                        throw new Error(data?.message || 'Failed to start Docker Compose');
+                    }
+                })
+                .catch(error => {
+                    console.error('Preview error:', error);
+                    btn.innerHTML = '❌ Preview Failed';
+                    btn.style.background = 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)';
+                    showMessage('error', error.message || 'Failed to start preview. Please check if the application is built.');
+                    
+                    setTimeout(() => {
+                        btn.innerHTML = originalText;
+                        btn.disabled = false;
+                        btn.style.background = 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
+                    }, 3000);
+                });
+        }
+
+        // Check status on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            checkBackendStatus();
+            
+            // Check preview server status
+            fetch('/api/preview/status')
+                .then(response => response.json())
+                .then(status => {
+                    if (status.running) {
+                        console.log('Preview server is running on', status.url);
+                    }
+                })
+                .catch(err => console.log('Could not check preview status:', err));
+        });
+    </script>
+</body>
+</html>
